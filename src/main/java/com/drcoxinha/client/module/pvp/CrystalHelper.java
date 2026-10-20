@@ -3,17 +3,84 @@ package com.drcoxinha.client.module.pvp;
 import com.drcoxinha.client.module.Category;
 import com.drcoxinha.client.module.Module;
 import com.drcoxinha.client.setting.*;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.Item;
+import net.minecraft.item.Items;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 
+/**
+ * Segurando cristal do fim e clicando (botao direito) num bloco que NAO e obsidiana/bedrock,
+ * coloca uma obsidiana da hotbar nesse local. Se o bloco ja e obsidiana/bedrock, nao faz nada
+ * (o proprio jogo coloca o cristal).
+ */
 public class CrystalHelper extends Module {
     public final NumberSetting delay = add(new NumberSetting("Delay (ticks)", 0, 0, 10, 1));
+
+    private boolean wasUse;
+    private BlockHitResult pending;
+    private int wait;
 
     public CrystalHelper() {
         super("Crystal Helper", "Coloca obsidiana + cristal", Category.PVP);
     }
 
     @Override
+    protected void onDisable() {
+        pending = null;
+    }
+
+    @Override
     public void onTick(MinecraftClient mc) {
-        // TODO Etapa 2/3: logica do modulo
+        boolean use = mc.options.useKey.isPressed();
+        boolean click = use && !wasUse;
+        wasUse = use;
+
+        if (click && mc.currentScreen == null
+                && mc.player.getMainHandStack().isOf(Items.END_CRYSTAL)
+                && mc.crosshairTarget instanceof BlockHitResult hit
+                && hit.getType() == HitResult.Type.BLOCK) {
+            BlockState st = mc.world.getBlockState(hit.getBlockPos());
+            if (!st.isOf(Blocks.OBSIDIAN) && !st.isOf(Blocks.BEDROCK)) {
+                pending = hit;
+                wait = delay.asInt();
+            }
+        }
+
+        if (pending != null) {
+            if (wait > 0) {
+                wait--;
+                return;
+            }
+            BlockHitResult hit = pending;
+            pending = null;
+            placeObsidian(mc, hit);
+        }
+    }
+
+    private void placeObsidian(MinecraftClient mc, BlockHitResult hit) {
+        PlayerInventory inv = mc.player.getInventory();
+        int slot = findInHotbar(inv, Items.OBSIDIAN);
+        if (slot < 0) return;
+
+        int previous = inv.getSelectedSlot();
+        inv.setSelectedSlot(slot);
+        ActionResult result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
+        if (result.isAccepted()) {
+            mc.player.swingHand(Hand.MAIN_HAND);
+        }
+        inv.setSelectedSlot(previous);
+    }
+
+    private static int findInHotbar(PlayerInventory inv, Item item) {
+        for (int i = 0; i < 9; i++) {
+            if (inv.getStack(i).isOf(item)) return i;
+        }
+        return -1;
     }
 }

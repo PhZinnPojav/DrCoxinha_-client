@@ -1,6 +1,6 @@
 # DrCoxinha_ Client  (Fabric 1.21.11)
 
-Etapa 1: base, config e menu (PvP / Finder). Os 11 modulos ja aparecem no menu com suas
+Etapa 2a: Crystal Helper, Crystal Pop, Totem Hand e Anchor Helper ja funcionam. Os 11 modulos aparecem no menu com suas
 configuracoes; a logica de cada um entra nas Etapas 2 (PvP) e 3 (Finder).
 
 ## Como gerar o .jar pelo GitHub (sem instalar nada)
