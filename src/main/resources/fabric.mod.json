@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "drcoxinha_client",
+  "version": "${version}",
+  "name": "DrCoxinha_ Client",
+  "description": "Client de Minecraft com modulos de PvP e Finder. Menu: Shift Direito.",
+  "authors": ["DrCoxinha_"],
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.drcoxinha.client.DrCoxinhaClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.1",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
