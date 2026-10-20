@@ -16,19 +16,23 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 
 /**
- * Segurando cristal do fim e clicando (botao direito) num bloco que NAO e obsidiana/bedrock,
- * coloca uma obsidiana da hotbar nesse local. Se o bloco ja e obsidiana/bedrock, nao faz nada
- * (o proprio jogo coloca o cristal).
+ * Segurando cristal do fim e clicando (botao direito) num bloco que NAO e obsidiana/bedrock:
+ * troca para a obsidiana da hotbar, coloca, e volta rapido para o cristal.
+ * Se o bloco ja e obsidiana/bedrock, nao faz nada (o proprio jogo coloca o cristal).
  */
 public class CrystalHelper extends Module {
     public final NumberSetting delay = add(new NumberSetting("Delay (ticks)", 0, 0, 10, 1));
+    public final NumberSetting returnDelay = add(new NumberSetting("Voltar ao cristal (ticks)", 1, 0, 5, 1));
 
     private boolean wasUse;
     private BlockHitResult pending;
     private int wait;
 
+    private int restoreTo = -1;
+    private int restoreTicks;
+
     public CrystalHelper() {
-        super("Crystal Helper", "Coloca obsidiana + cristal", Category.PVP);
+        super("Crystal Helper", "Troca p/ obsidiana, coloca e volta", Category.PVP);
     }
 
     @Override
@@ -38,6 +42,17 @@ public class CrystalHelper extends Module {
 
     @Override
     public void onTick(MinecraftClient mc) {
+        // volta para o cristal depois de colocar a obsidiana
+        if (restoreTo >= 0) {
+            if (restoreTicks > 0) {
+                restoreTicks--;
+            } else {
+                mc.player.getInventory().setSelectedSlot(restoreTo);
+                restoreTo = -1;
+            }
+            return;
+        }
+
         boolean use = mc.options.useKey.isPressed();
         boolean click = use && !wasUse;
         wasUse = use;
@@ -72,7 +87,7 @@ public class CrystalHelper extends Module {
             return;
         }
 
-        int previous = inv.getSelectedSlot();
+        int crystalSlot = inv.getSelectedSlot();
         inv.setSelectedSlot(slot);
         ActionResult result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
         if (result.isAccepted()) {
@@ -81,7 +96,10 @@ public class CrystalHelper extends Module {
         } else {
             Notify.bar("Crystal Helper: nao deu para colocar aqui");
         }
-        inv.setSelectedSlot(previous);
+
+        // continua com a obsidiana selecionada por alguns ticks e entao volta ao cristal
+        restoreTo = crystalSlot;
+        restoreTicks = returnDelay.asInt();
     }
 
     private static int findInHotbar(PlayerInventory inv, Item item) {
