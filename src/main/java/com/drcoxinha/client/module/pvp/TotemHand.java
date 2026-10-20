@@ -1,5 +1,6 @@
 package com.drcoxinha.client.module.pvp;
 
+import com.drcoxinha.client.Notify;
 import com.drcoxinha.client.module.Category;
 import com.drcoxinha.client.module.Module;
 import com.drcoxinha.client.setting.*;
@@ -57,10 +58,14 @@ public class TotemHand extends Module {
                 slots.add(i);
             }
         }
-        if (slots.isEmpty()) return;
+        if (slots.isEmpty()) {
+            Notify.bar("Totem Hand: nenhum totem no inventario");
+            return;
+        }
 
         int chosen = slots.get(random.nextInt(slots.size()));
         // SWAP com botao 40 = troca com a mao secundaria
         mc.interactionManager.clickSlot(handler.syncId, chosen, 40, SlotActionType.SWAP, mc.player);
+        Notify.bar("Totem Hand: totem colocado na mao esquerda");
     }
 }

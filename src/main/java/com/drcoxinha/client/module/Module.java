@@ -1,5 +1,6 @@
 package com.drcoxinha.client.module;
 
+import com.drcoxinha.client.Notify;
 import com.drcoxinha.client.setting.Setting;
 import net.minecraft.client.MinecraftClient;
 
@@ -33,6 +34,7 @@ public abstract class Module {
         if (this.enabled == value) return;
         this.enabled = value;
         if (value) onEnable(); else onDisable();
+        Notify.bar(name + ": " + (value ? "\u00a7aON" : "\u00a7cOFF"));
     }
 
     public void toggle() {

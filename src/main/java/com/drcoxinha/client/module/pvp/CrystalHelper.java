@@ -1,5 +1,6 @@
 package com.drcoxinha.client.module.pvp;
 
+import com.drcoxinha.client.Notify;
 import com.drcoxinha.client.module.Category;
 import com.drcoxinha.client.module.Module;
 import com.drcoxinha.client.setting.*;
@@ -66,13 +67,19 @@ public class CrystalHelper extends Module {
     private void placeObsidian(MinecraftClient mc, BlockHitResult hit) {
         PlayerInventory inv = mc.player.getInventory();
         int slot = findInHotbar(inv, Items.OBSIDIAN);
-        if (slot < 0) return;
+        if (slot < 0) {
+            Notify.bar("Crystal Helper: sem obsidiana na hotbar");
+            return;
+        }
 
         int previous = inv.getSelectedSlot();
         inv.setSelectedSlot(slot);
         ActionResult result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
         if (result.isAccepted()) {
             mc.player.swingHand(Hand.MAIN_HAND);
+            Notify.bar("Crystal Helper: obsidiana colocada");
+        } else {
+            Notify.bar("Crystal Helper: nao deu para colocar aqui");
         }
         inv.setSelectedSlot(previous);
     }

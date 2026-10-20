@@ -1,5 +1,6 @@
 package com.drcoxinha.client.module.pvp;
 
+import com.drcoxinha.client.Notify;
 import com.drcoxinha.client.module.Category;
 import com.drcoxinha.client.module.Module;
 import com.drcoxinha.client.setting.*;
@@ -53,6 +54,7 @@ public class AnchorHelper extends Module {
                 return;
             }
             mc.player.getInventory().setSelectedSlot(slot.asInt() - 1);
+            Notify.bar("Anchor Helper: slot " + slot.asInt() + " selecionado");
             watch = null;
         } else if (--ticksLeft <= 0) {
             watch = null;

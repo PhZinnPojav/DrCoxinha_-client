@@ -1,5 +1,6 @@
 package com.drcoxinha.client.module.pvp;
 
+import com.drcoxinha.client.Notify;
 import com.drcoxinha.client.module.Category;
 import com.drcoxinha.client.module.Module;
 import com.drcoxinha.client.setting.*;
@@ -31,6 +32,7 @@ public class CrystalPop extends Module {
             mc.interactionManager.attackEntity(mc.player, crystal);
             mc.player.swingHand(Hand.MAIN_HAND);
             cooldown = delay.asInt();
+            Notify.bar("Crystal Pop: cristal atingido");
         }
     }
 }

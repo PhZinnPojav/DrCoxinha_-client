@@ -10,7 +10,9 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Menu do client. Toda a entrada (mouse/teclado) e lida por polling do GLFW dentro do
@@ -20,6 +22,8 @@ import java.util.List;
 public class ClickGuiScreen extends Screen {
     private static final int W = 400;
     private static final int H = 250;
+    private static final int ROW_H = 20;
+    private static final int VISIBLE_ROWS = 8;
 
     private Category tab = Category.PVP;
     private Module selected;
@@ -29,6 +33,10 @@ public class ClickGuiScreen extends Screen {
     private final boolean[] prevKeys = new boolean[GLFW.GLFW_KEY_LAST + 1];
 
     private KeySetting listening;
+
+    private int scroll;
+    private Module lastSelected;
+    private final Set<ColorSetting> expanded = new HashSet<>();
 
     private NumberSetting dragNum;
     private ColorSetting dragCol;
@@ -54,6 +62,16 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean shouldPause() {
         return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (verticalAmount > 0) {
+            scroll--;
+        } else if (verticalAmount < 0) {
+            scroll++;
+        }
+        return true;
     }
 
     @Override
@@ -179,15 +197,22 @@ public class ClickGuiScreen extends Screen {
             text(ctx, selected.name, sx, sy, Theme.ORANGE);
             String desc = this.textRenderer.trimToWidth(selected.description, sw);
             text(ctx, desc, sx, sy + 11, Theme.MUTED);
+            if (selected != lastSelected) {
+                scroll = 0;
+                lastSelected = selected;
+            }
             if (selected.settings.isEmpty()) {
                 text(ctx, "Sem configuracoes.", sx, sy + 30, Theme.MUTED);
             } else {
+                int total = rowCount(selected);
+                scroll = Math.max(0, Math.min(scroll, Math.max(0, total - VISIBLE_ROWS)));
                 drawSettings(ctx, mouseX, mouseY, clickL, left, sx, sy + 26, sw);
+                drawScrollbar(ctx, sx + sw + 3, sy + 26, total);
             }
         }
 
         // rodape
-        text(ctx, "Esq: ligar/desligar   Dir ou >: configs   Shift Dir.: fechar",
+        text(ctx, "Esq: ligar  Dir/>: configs  Roda: rolar  Shift Dir.: fechar",
                 x0 + 10, y0 + H - 14, Theme.MUTED);
     }
 
@@ -205,72 +230,105 @@ public class ClickGuiScreen extends Screen {
         text(ctx, value, x + w - 6 - this.textRenderer.getWidth(value), y + 5, valueColor);
     }
 
+    private int rowCount(Module m) {
+        int n = 0;
+        for (Setting<?> st : m.settings) {
+            n += (st instanceof ColorSetting c && expanded.contains(c)) ? 4 : 1;
+        }
+        return n;
+    }
+
+    private void drawScrollbar(DrawContext ctx, int x, int y, int total) {
+        if (total <= VISIBLE_ROWS) return;
+        int track = VISIBLE_ROWS * ROW_H - 2;
+        int thumb = Math.max(10, track * VISIBLE_ROWS / total);
+        int maxScroll = total - VISIBLE_ROWS;
+        int pos = (track - thumb) * scroll / maxScroll;
+        ctx.fill(x, y, x + 3, y + track, Theme.ROW);
+        ctx.fill(x, y + pos, x + 3, y + pos + thumb, Theme.ORANGE);
+    }
+
     private void drawSettings(DrawContext ctx, int mouseX, int mouseY, boolean clickL, boolean left,
                               int sx, int startY, int sw) {
-        int y = startY;
+        int r = 0;
         for (Setting<?> s : selected.settings) {
-            boolean hov = inside(mouseX, mouseY, sx, y, sw, 18);
+            int y = startY + (r - scroll) * ROW_H;
+            boolean visible = r >= scroll && r < scroll + VISIBLE_ROWS;
+            boolean hov = visible && inside(mouseX, mouseY, sx, y, sw, 18);
 
-            if (s instanceof BoolSetting b) {
-                boolean on = b.get();
-                row(ctx, sx, y, sw, b.name, on ? "ON" : "OFF", on ? Theme.ORANGE : Theme.MUTED, hov);
-                if (hov && clickL) b.toggle();
-                y += 20;
-
-            } else if (s instanceof NumberSetting n) {
-                double frac = (n.get() - n.min) / (n.max - n.min);
-                slider(ctx, sx, y, sw, n.name, n.display(), frac, hov);
-                if (hov && clickL) {
-                    dragNum = n;
-                    dragCol = null;
-                    dragX = sx;
-                    dragW = sw;
+            if (s instanceof ColorSetting c) {
+                boolean open = expanded.contains(c);
+                if (visible) {
+                    ctx.fill(sx, y, sx + sw, y + 18, hov ? Theme.ROW_HOVER : Theme.ROW);
+                    text(ctx, (open ? "v " : "> ") + c.name, sx + 6, y + 5, Theme.TEXT);
+                    int swx = sx + sw - 6 - 28;
+                    ctx.fill(swx - 1, y + 3, swx + 29, y + 15, Theme.MUTED);
+                    ctx.fill(swx, y + 4, swx + 28, y + 14, 0xFF000000 | c.get());
+                    if (hov && clickL) {
+                        if (open) expanded.remove(c); else expanded.add(c);
+                    }
                 }
-                if (dragNum == n && left) {
-                    n.setFromFraction((mouseX - dragX) / (double) dragW);
+                r++;
+                if (open) {
+                    String[] names = {"  Vermelho", "  Verde", "  Azul"};
+                    for (int ch = 0; ch < 3; ch++) {
+                        int cy = startY + (r - scroll) * ROW_H;
+                        boolean cVisible = r >= scroll && r < scroll + VISIBLE_ROWS;
+                        if (cVisible) {
+                            boolean h = inside(mouseX, mouseY, sx, cy, sw, 18);
+                            int v = c.channel(ch);
+                            slider(ctx, sx, cy, sw, names[ch], String.valueOf(v), v / 255.0, h);
+                            if (h && clickL) {
+                                dragCol = c;
+                                dragChannel = ch;
+                                dragNum = null;
+                                dragX = sx;
+                                dragW = sw;
+                            }
+                        }
+                        if (dragCol == c && dragChannel == ch && left) {
+                            c.setChannel(ch, (int) Math.round(255.0 * clamp01((mouseX - dragX) / (double) dragW)));
+                        }
+                        r++;
+                    }
                 }
-                y += 20;
+                continue;
+            }
 
-            } else if (s instanceof ColorSetting c) {
-                ctx.fill(sx, y, sx + sw, y + 18, Theme.ROW);
-                text(ctx, c.name, sx + 6, y + 5, Theme.TEXT);
-                int swx = sx + sw - 6 - 28;
-                ctx.fill(swx - 1, y + 3, swx + 29, y + 15, Theme.MUTED);
-                ctx.fill(swx, y + 4, swx + 28, y + 14, 0xFF000000 | c.get());
-                y += 20;
-                String[] names = {"  Vermelho", "  Verde", "  Azul"};
-                for (int ch = 0; ch < 3; ch++) {
-                    boolean h = inside(mouseX, mouseY, sx, y, sw, 18);
-                    int v = c.channel(ch);
-                    slider(ctx, sx, y, sw, names[ch], String.valueOf(v), v / 255.0, h);
-                    if (h && clickL) {
-                        dragCol = c;
-                        dragChannel = ch;
-                        dragNum = null;
+            if (visible) {
+                if (s instanceof BoolSetting b) {
+                    boolean on = b.get();
+                    row(ctx, sx, y, sw, b.name, on ? "ON" : "OFF", on ? Theme.ORANGE : Theme.MUTED, hov);
+                    if (hov && clickL) b.toggle();
+
+                } else if (s instanceof NumberSetting n) {
+                    double frac = (n.get() - n.min) / (n.max - n.min);
+                    slider(ctx, sx, y, sw, n.name, n.display(), frac, hov);
+                    if (hov && clickL) {
+                        dragNum = n;
+                        dragCol = null;
                         dragX = sx;
                         dragW = sw;
                     }
-                    if (dragCol == c && dragChannel == ch && left) {
-                        c.setChannel(ch, (int) Math.round(255.0 * clamp01((mouseX - dragX) / (double) dragW)));
-                    }
-                    y += 20;
+
+                } else if (s instanceof KeySetting k) {
+                    boolean waiting = listening == k;
+                    row(ctx, sx, y, sw, k.name, waiting ? "..." : KeyNames.of(k.get()),
+                            waiting ? Theme.ORANGE : Theme.TEXT, hov);
+                    if (hov && clickL) listening = waiting ? null : k;
+
+                } else if (s instanceof ModeSetting m) {
+                    row(ctx, sx, y, sw, m.name, m.get(), Theme.ORANGE, hov);
+                    if (hov && clickL) m.next();
                 }
-
-            } else if (s instanceof KeySetting k) {
-                boolean waiting = listening == k;
-                row(ctx, sx, y, sw, k.name, waiting ? "..." : KeyNames.of(k.get()),
-                        waiting ? Theme.ORANGE : Theme.TEXT, hov);
-                if (hov && clickL) listening = waiting ? null : k;
-                y += 20;
-
-            } else if (s instanceof ModeSetting m) {
-                row(ctx, sx, y, sw, m.name, m.get(), Theme.ORANGE, hov);
-                if (hov && clickL) m.next();
-                y += 20;
             }
+            if (s instanceof NumberSetting n && dragNum == n && left) {
+                n.setFromFraction((mouseX - dragX) / (double) dragW);
+            }
+            r++;
         }
         if (listening != null) {
-            text(ctx, "Aperte uma tecla (Esc cancela, Backspace limpa)", sx, y + 4, Theme.MUTED);
+            text(ctx, "Aperte uma tecla (Esc cancela, Backspace limpa)", sx, startY + VISIBLE_ROWS * ROW_H, Theme.MUTED);
         }
     }
 }
